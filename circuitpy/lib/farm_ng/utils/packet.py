@@ -13,6 +13,7 @@ DASHBOARD_NODE_ID = 0xE
 PENDANT_NODE_ID = 0xF
 BRAIN_NODE_ID = 0x1F
 SDK_NODE_ID = 0x2A
+GANTRY_ID = 0x12
 
 
 class ReqRepIds:
@@ -50,6 +51,16 @@ class AmigaControlState:
     STATE_CC_ACTIVE = 3
     STATE_AUTO_READY = 4
     STATE_AUTO_ACTIVE = 5
+    STATE_ESTOPPED = 6
+    
+class GantryControlState:
+    """State of the Amiga vehicle control unit (VCU)"""
+
+    STATE_MANUAL_READY = 1
+    STATE_MANUAL_ACTIVE = 2
+    STATE_AUTO_READY = 3
+    STATE_AUTO_ACTIVE = 4
+    STATE_ALARM = 5
     STATE_ESTOPPED = 6
 
 
@@ -188,6 +199,61 @@ class AmigaRpdo1(Packet):
             self.state_req, self.cmd_speed, self.cmd_ang_rate
         ) + " Command PTO bits 0x{:x} Command h-bridge bits 0x{:x}".format(self.pto_bits, self.hbridge_bits)
 
+#/////////////
+class GantryRpdo1(Packet):
+    #State, feed, location, relative, and jog (request) sent to the Amiga vehicle control unit (VCU).
+    
+
+    cob_id = 0x200
+
+    def __init__(
+        self,
+        state_req: GantryControlState = GantryControlState.STATE_ESTOPPED,
+        cmd_feed: int = 0,
+        cmd_x: int = 0,
+        cmd_y: int = 0,
+        relative: bool = True,
+        jog: bool = True,
+        pto_bits: int = 0x0
+    ):
+        self.format = "<BhhBBx"
+        self.legacy_format = "<Bhh"
+
+        self.state_req = state_req
+        self.cmd_feed = cmd_feed
+        self.cmd_x = cmd_x
+        self.cmd_y = cmd_y
+        self.relative = relative
+        self.jog = jog
+        self.pto_bits = pto_bits
+
+        self.stamp()
+
+    def encode(self):
+        """Returns the data contained by the class encoded as CAN message data."""
+        return pack(
+            self.format,
+            self.state_req,
+            self.cmd_feed,
+            self.cmd_x,
+            self.cmd_y,
+            self.relative,
+            self.jog,
+            self.pto_bits,
+        )
+
+    def decode(self, data):
+        """Decodes CAN message data and populates the values of the class."""
+
+        (self.state_req, self.cmd_feed, self.cmd_x, self.cmd_y, self.relative, self.jog, self.pto_bits) = unpack(self.format, data)
+
+
+    def __str__(self):
+        return "Gantry RPDO1 Request state {} Command feed {:x} Command x {:x} Command y {:x}".format(
+            self.state_req, self.cmd_feed, self.cmd_x, self.cmd_y
+        ) + "  Relative {} Jog {}".format(self.relative, self.jog)
+#/////////////
+
 
 class AmigaTpdo1(Packet):
     """State, speed, and angular rate of the Amiga vehicle control unit (VCU).
@@ -242,6 +308,62 @@ class AmigaTpdo1(Packet):
         return "AMIGA TPDO1 Amiga state {} Measured speed {:0.3f} Measured angular rate {:0.3f}".format(
             self.state, self.meas_speed, self.meas_ang_rate
         ) + " PTO bits 0x{:x} h-bridge bits 0x{:x}".format(self.pto_bits, self.hbridge_bits)
+
+#/////////////
+class GantryTpdo1(Packet):
+    """State, speed, and angular rate of the Amiga vehicle control unit (VCU).
+
+    New in fw v0.1.9 / farm-ng-amiga v0.0.7: Add pto & hbridge control. Message data is now 8 bytes (was 5).
+    """
+
+    cob_id = 0x180
+
+    def __init__(
+        self,
+        state: GantryControlState = GantryControlState.STATE_ESTOPPED,
+        meas_feed: int = 0,
+        meas_x: int = 0,
+        meas_y: int = 0,
+        relative: bool = True,
+        jog: bool = True,
+        pto_bits: int = 0x0,
+    ):
+        self.format = "<BhhBBx"
+        self.legacy_format = "<Bhh"
+
+        self.state = state
+        self.meas_feed = meas_feed
+        self.meas_x = meas_x
+        self.meas_y = meas_y
+        self.relative = relative
+        self.jog = jog
+        self.pto_bits = pto_bits
+
+        self.stamp_packet(time.monotonic())
+
+    def encode(self):
+        """Returns the data contained by the class encoded as CAN message data."""
+        return pack(
+            self.format,
+            self.state,
+            self.meas_feed,
+            self.meas_x,
+            self.relative,
+            self.jog,
+            self.pto_bits,
+        )
+
+    def decode(self, data):
+        """Decodes CAN message data and populates the values of the class."""
+        (self.state, self.meas_feed, self.meas_x, self.meas_y, self.pto_bits, self.hbridge_bits) = unpack(self.format, data)
+
+
+    def __str__(self):
+        return "Gantry TPDO1 Amiga state {} Measured feed {:x} Measured x {:x} Measured y{:x} @ time {}".format(
+            self.state, self.meas_feed, self.meas_x, self.meas_y, self.stamp.stamp
+        ) + "  Relative {} Jog {}".format(self.relative, self.jog)
+#/////////////
+
 
 
 class SupervisorReq(Packet):
@@ -634,3 +756,5 @@ class FarmngDebugMemory(Packet):
             s += "{:5d},".format(x)
         s += ")"
         return s
+
+

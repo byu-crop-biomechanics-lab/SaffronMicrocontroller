@@ -1,14 +1,11 @@
-# what is the cob_id line 72
-# what is self.format line 8*
 # create function for finding whether or not the purple color is centered
-# create code.py for the M4 feather
-
+# whats the deal with the RPDO1 and TPDO1? 
+# error with the bad typecode
 
 
 from __future__ import annotations
 
 import time
-from enum import IntEnum
 from struct import pack
 from struct import unpack
 
@@ -20,12 +17,10 @@ from farm_ng.canbus import canbus_pb2
 from farm_ng.canbus.packet import Packet
 
 
-
-GANTRY_ID = 0x12
 # feed rate, x position, y position
 
 
-class GantryControlState(IntEnum):
+class GantryControlState:
     """State of the Amiga vehicle control unit (VCU)"""
 
     # TODO: add some comments about this states
@@ -87,8 +82,7 @@ class GantryRpdo1(Packet):
         jog: bool = True,
         pto_bits: int = 0x0
     ):
-        self.format = "<BhhBBx"
-        self.legacy_format = "<Bhh"
+        self.format = "<e"
 
         self.state_req = state_req
         self.cmd_feed = cmd_feed
